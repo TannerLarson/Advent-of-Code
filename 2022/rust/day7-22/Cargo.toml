@@ -1,9 +1,12 @@
 [package]
-name = "day9"
+name = "day7-22"
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+camino = "1.1.6"
+color-eyre = "0.6.2"
+id_tree = "1.8.0"
 nom = "7.1.3"

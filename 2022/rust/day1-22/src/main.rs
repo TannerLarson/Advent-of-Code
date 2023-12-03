@@ -10,7 +10,7 @@ fn a() -> Option<u64> {
     include_str!("../../../inputs/1-calorie-counting.txt")
         .lines()
         .map(|calorie_value| calorie_value.parse::<u64>().ok())
-        .batching(|it| {
+        .batching(|it| {a
             let mut sum = None;
             while let Some(Some(calorie_value)) = it.next() {
                 sum = Some(sum.unwrap_or(0) + calorie_value);

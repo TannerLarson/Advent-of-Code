@@ -1,0 +1,6 @@
+[workspace]
+
+members = [
+    "2022/rust/day*",
+    "2023/rust/day*"
+]
