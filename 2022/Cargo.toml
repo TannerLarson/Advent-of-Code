@@ -1,0 +1,5 @@
+[workspace]
+members = [
+    "./rust/day*",
+    "./rust_with_help/day_1"
+]
