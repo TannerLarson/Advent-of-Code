@@ -6,6 +6,17 @@ pub struct GridCoord {
     pub y: usize,
 }
 
+impl GridCoord {
+    pub fn get_relative_coord(self, x: i32, y: i32) -> Self {
+        let new_x = self.x as i32 + x;
+        let new_y = self.y as i32 + y;
+        GridCoord {
+            x: new_x as usize,
+            y: new_y as usize,
+        }
+    }
+}
+
 impl std::fmt::Debug for GridCoord {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "({}, {})", self.x, self.y)
