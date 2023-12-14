@@ -1,8 +1,10 @@
 use core::fmt;
 use roots::{find_roots_quadratic, Roots};
 use std::ops::Range;
+use std::time::Instant;
 
 fn main() {
+    let start = Instant::now();
     let mut parsed_lines = include_str!("input.txt").lines().map(|s| {
         s.split_whitespace()
             .filter_map(|s| s.parse::<u64>().ok())
@@ -10,13 +12,17 @@ fn main() {
     });
     let times = parsed_lines.next().unwrap();
     let distances = parsed_lines.next().unwrap();
+    let ans = get_answer(times, distances);
+    let duration = start.elapsed();
 
-    println!("Part 1: {}", get_answer(times, distances));
-    // let times = vec![71530];
-    // let distances = vec![940200];
+    println!("Part 1: {}", ans);
+    println!("Part 1 duration: {} nanoseconds", duration.as_nanos());
+    let start = Instant::now();
     let times = vec![49787980];
     let distances = vec![298118510661181];
-    println!("Part 2: {}", get_answer(times, distances))
+    println!("Part 2: {}", get_answer(times, distances));
+    let duration = start.elapsed();
+    println!("Part 2 duration: {} nanoseconds", duration.as_nanos());
 }
 
 fn get_answer(times: Vec<u64>, distances: Vec<u64>) -> u64 {
