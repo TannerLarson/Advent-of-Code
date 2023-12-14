@@ -187,6 +187,7 @@ dependencies = [
 name = "day5-23"
 version = "0.1.0"
 dependencies = [
+ "itertools 0.12.0",
  "nom",
 ]
 
