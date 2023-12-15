@@ -21,7 +21,7 @@ fn main() {
     println!("Winnings: {}", winnings);
 }
 
-fn get_hand_type(cards: &[Card]) -> HandType {
+fn get_hand_type(cards: &[Card], use_jokers: Option<bool>) -> HandType {
     let num_same_cards = cards
         .iter()
         .sorted()
@@ -31,7 +31,7 @@ fn get_hand_type(cards: &[Card]) -> HandType {
         .sorted()
         .rev()
         .collect_vec();
-    match num_same_cards[..] {
+    let mut hand_type = match num_same_cards[..] {
         [5] => HandType::FiveOfAKind,
         [4, 1] => HandType::FourOfAKind,
         [3, 2] => HandType::FullHouse,
@@ -40,7 +40,26 @@ fn get_hand_type(cards: &[Card]) -> HandType {
         [2, 1, 1, 1] => HandType::OnePair,
         [1, 1, 1, 1, 1] => HandType::HighCard,
         _ => panic!("Found a type we're scared of: {:?}", num_same_cards),
+    };
+    if use_jokers.is_some() && cards.contains(&Card::Joker) {
+        println!("x:{:?}", num_same_cards);
+        hand_type = match hand_type {
+            HandType::FiveOfAKind => HandType::FiveOfAKind,
+            HandType::FourOfAKind => HandType::FiveOfAKind,
+            HandType::FullHouse => HandType::FiveOfAKind,
+            HandType::ThreeOfAKind => HandType::FourOfAKind,
+            HandType::TwoPair => {
+                if cards.iter().filter(|card| card == &&Card::Joker).count() == 2 {
+                    HandType::FourOfAKind
+                } else {
+                    HandType::FullHouse
+                }
+            }
+            HandType::OnePair => HandType::ThreeOfAKind,
+            HandType::HighCard => HandType::OnePair,
+        }
     }
+    hand_type
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone)]
@@ -64,7 +83,7 @@ impl FromStr for Hand {
             .collect::<Result<Vec<Card>, HandParseError>>()?;
         let bid = s_bid.parse::<u32>().map_err(|_| HandParseError)?;
         Ok(Hand {
-            hand_type: get_hand_type(&cards),
+            hand_type: get_hand_type(&cards, Some(true)),
             cards,
             bid,
         })
@@ -105,8 +124,8 @@ impl fmt::Display for HandType {
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Copy, Clone)]
 enum Card {
+    Joker,
     Num(u8),
-    Jack,
     Queen,
     King,
     Ace,
@@ -119,7 +138,7 @@ impl TryFrom<char> for Card {
             'A' => Ok(Card::Ace),
             'K' => Ok(Card::King),
             'Q' => Ok(Card::Queen),
-            'J' => Ok(Card::Jack),
+            'J' => Ok(Card::Joker),
             'T' => Ok(Card::Num(10)),
             c => Ok(Card::Num(c.to_digit(10).unwrap() as u8)),
         }
@@ -132,7 +151,7 @@ impl fmt::Debug for Card {
             Card::Ace => 'A',
             Card::King => 'K',
             Card::Queen => 'Q',
-            Card::Jack => 'J',
+            Card::Joker => 'J',
             Card::Num(10) => 'T',
             Card::Num(n) => char::from_digit(*n as u32, 10).unwrap(),
         };
