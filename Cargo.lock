@@ -137,6 +137,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "day10-23"
+version = "0.1.0"
+dependencies = [
+ "grid",
+ "itertools 0.12.0",
+]
+
+[[package]]
 name = "day2-22"
 version = "0.1.0"
 
@@ -278,6 +286,12 @@ name = "gimli"
 version = "0.28.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4271d37baee1b8c7e4b708028c57d816cf9d2434acb33a549475f78c181f6253"
+
+[[package]]
+name = "grid"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d196ffc1627db18a531359249b2bf8416178d84b729f3cebeb278f285fb9b58c"
 
 [[package]]
 name = "hermit-abi"

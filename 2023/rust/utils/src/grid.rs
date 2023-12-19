@@ -76,4 +76,23 @@ where
     pub fn height(&self) -> usize {
         self.height
     }
+
+    pub fn all_coords(&self) -> Vec<GridCoord> {
+        (0..self.height())
+            .flat_map(|y| (0..self.width()).map(move |x| GridCoord::from((x, y))))
+            .collect()
+    }
+}
+
+pub fn parse_grid(input: &str) -> Grid<char> {
+    let width = input.lines().next().unwrap().len();
+    let height = input.lines().count();
+    let mut grid = Grid::new(width, height);
+
+    for (y, line) in input.lines().enumerate() {
+        for (x, col) in line.chars().enumerate() {
+            *grid.cell_mut((x, y).into()).unwrap() = col
+        }
+    }
+    grid
 }
