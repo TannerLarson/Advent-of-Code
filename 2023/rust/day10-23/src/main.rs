@@ -3,7 +3,7 @@ use grid::{grid, Grid};
 use itertools::Itertools;
 
 fn main() {
-    let grid = parse_input(include_str!("input.txt"));
+    let grid = parse_input(include_str!("ex1.txt"));
     let start = match grid
         .indexed_iter()
         .filter_map(|(coord, seg)| {
@@ -31,6 +31,7 @@ fn main() {
         panic!("haoiest")
     }
     println!("{:?}", pipe);
+    println!("{:?}", grid.get(2, 2).unwrap().is_enclosed(&grid))
 }
 
 trait GridExt<T> {
@@ -63,12 +64,24 @@ impl GridCoord {
         }
     }
 
-    fn get_relative_coord(&self, dir: Direction) -> Self {
+    fn get_relative_coord(&self, dir: Direction) -> Option<Self> {
         match dir {
-            Direction::East => GridCoord::new((self.x + 1, self.y)),
-            Direction::North => GridCoord::new((self.x, self.y + 1)),
-            Direction::South => GridCoord::new((self.x, self.y - 1)),
-            Direction::West => GridCoord::new((self.x - 1, self.y)),
+            Direction::East => Some(GridCoord::new((self.x + 1, self.y))),
+            Direction::North => Some(GridCoord::new((self.x, self.y + 1))),
+            Direction::South => {
+                if self.y == 0 {
+                    None
+                } else {
+                    Some(GridCoord::new((self.x, self.y - 1)))
+                }
+            }
+            Direction::West => {
+                if self.x == 0 {
+                    None
+                } else {
+                    Some(GridCoord::new((self.x - 1, self.y)))
+                }
+            }
         }
     }
 }
@@ -138,7 +151,8 @@ impl Segment {
         self.directions.iter().any(|dir| *dir == direction)
     }
 
-    fn is_enclosed(&self, grid: Grid<Segment>) -> bool {
+    fn is_enclosed(&self, grid: &Grid<Segment>) -> bool {
+        println!("{:?}", self);
         if self.symbol != '.' {
             return false;
         }
@@ -146,7 +160,7 @@ impl Segment {
         let mut total = 0_u32;
         let mut saw_f = false;
         let mut saw_seven = false;
-        while current_seg.coord.y != 0 {
+        loop {
             match current_seg.symbol {
                 '_' => total += 1,
                 'F' => saw_f = true,
@@ -165,10 +179,15 @@ impl Segment {
                 }
                 _ => (),
             }
-            current_seg = grid
-                .get_with_coord(&current_seg.coord.get_relative_coord(Direction::South))
-                .unwrap()
-                .clone()
+            println!(
+                "{:?}",
+                current_seg.coord.get_relative_coord(Direction::South)
+            );
+            let next_coord = match current_seg.coord.get_relative_coord(Direction::South) {
+                Some(coord) => coord,
+                None => break,
+            };
+            current_seg = grid.get_with_coord(&next_coord).unwrap().clone();
         }
         total % 2 == 1
     }
@@ -236,20 +255,24 @@ fn extrapolate_s_symbol(pipe: &Pipe) -> char {
     ];
     directions = directions
         .iter()
-        .filter(|dir| {
-            let coord = pipe.0.first().unwrap().coord.get_relative_coord(**dir);
-            pipe.0.last().unwrap().coord == coord || pipe.0.get(1).unwrap().coord == coord
-        })
+        .filter(
+            |dir| match pipe.0.first().unwrap().coord.get_relative_coord(**dir) {
+                Some(coord) => {
+                    pipe.0.last().unwrap().coord == coord || pipe.0.get(1).unwrap().coord == coord
+                }
+                None => false,
+            },
+        )
         .cloned()
         .collect_vec();
     directions.sort();
     match directions[..] {
         [Direction::North, Direction::South] => '|',
         [Direction::North, Direction::East] => 'F',
-        [Direction::North, Direction::West] => 'J',
-        [Direction::East, Direction::South] => 'L',
+        [Direction::North, Direction::West] => 'L',
+        [Direction::East, Direction::South] => '7',
         [Direction::East, Direction::West] => '-',
-        [Direction::South, Direction::West] => '7',
+        [Direction::South, Direction::West] => 'J',
         _ => panic!("We shouldn't get here: {:?}", directions),
     }
 }
@@ -277,16 +300,18 @@ fn adjacent_compatible_coords(coord: &GridCoord, grid: &Grid<Segment>) -> Vec<Gr
     ];
     dirs.iter()
         .filter(|dir| {
-            let next_coord = coord.get_relative_coord(**dir);
-            match grid.get_with_coord(&next_coord) {
-                Some(next_seg) => {
+            match coord.get_relative_coord(**dir) {
+                Some(next_coord) => {
                     // Check if both current and next segments can connect to each other
                     grid.get_with_coord(coord).unwrap().can_connect(**dir)
-                        && next_seg.can_connect(dir.opposite())
+                        && grid
+                            .get_with_coord(&next_coord)
+                            .unwrap()
+                            .can_connect(dir.opposite())
                 }
                 None => false,
             }
         })
-        .map(|dir| coord.get_relative_coord(*dir))
+        .map(|dir| coord.get_relative_coord(*dir).unwrap())
         .collect_vec()
 }
