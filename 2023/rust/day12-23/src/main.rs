@@ -1,6 +1,9 @@
 use core::fmt;
 use itertools::Itertools;
 use num_integer::binomial;
+use std::cmp::Ordering;
+use std::collections::VecDeque;
+use std::thread::current;
 use std::{collections::HashSet, str::FromStr};
 
 fn main() {
@@ -9,7 +12,7 @@ fn main() {
         .map(|line| line.parse().unwrap())
         .collect();
     for springs in input {
-        println!("{:?}, {:?}", springs.line, springs.hint);
+        println!("{:?}, {:?}", springs.line, springs.damaged);
         springs.possible_lines();
         println!()
     }
@@ -17,7 +20,7 @@ fn main() {
 
 struct Springs {
     line: Line,
-    hint: Vec<u8>,
+    damaged: Vec<u8>,
     len: usize,
 }
 
@@ -27,71 +30,69 @@ impl Springs {
     /// k = Buckets to distribute across
     /// If hint == [3, 8] and len == 15, then n = 3 (15 - 12) and k = 3 (before 3, between 3 and 8, after 8)
     fn theoretical_num_configs(&self) -> u8 {
-        let n = self.len as u8 - (self.hint.iter().sum::<u8>() + self.hint.len() as u8 - 1);
+        let n = self.len as u8 - (self.damaged.iter().sum::<u8>() + self.damaged.len() as u8 - 1);
         let k = (self.len + 1) as u8;
-        binomial(k + n - 1, n)
+        binomial(n - 1, k)
     }
 
     /*
-        ??#?##????#???...? 8,1,2,1
-        n = 3
-        k = 5
-        xxxxxxxx|x|xx|x
+        ?#??#?##??.??? 7,1,1
+        sum_damaged = self.len
+        n = 5
+        k = 2, 3, 4
 
-    -- [1 0 0 0 0] -- 5?
-    - [2 0 0 0 0] -5
-    [3 0 0 0 0]
-    [2 1 0 0 0]
-    [2 0 1 0 0]
-    [2 0 0 1 0]
-    [2 0 0 0 1]
-    - [1 1 0 0 0] - 4
-    [1 2 0 0 0]
-    [1 1 1 0 0]
-    [1 1 0 1 0]
-    [1 1 0 0 1]
-    - [1 0 1 0 0] - 3
-    [1 0 2 0 0]
-    [1 0 1 1 0]
-    [1 0 1 0 1]
-    - [1 0 0 1 0] - 2
-    [1 0 0 2 0]
-    [1 0 0 1 1]
-    - [1 0 0 0 1] - 1
-    [1 0 0 0 2]
+        k = 4
+        [2 1 1 1]
+        [1 2 1 1]
+        [1 1 2 1]
+        [1 1 1 2]
 
-    -- [0 1 0 0 0] -- 4?
-    - [0 2 0 0 0] - 4
-    - [0 1 1 0 0] - 3
-    - [0 1 0 1 0] - 2
-    - [0 1 0 0 1] - 1
+        k = 3
+        - [2 1 1] - 3
+        [3 1 1]
+        [2 2 1]
+        [2 1 2]
+        - [1 2 1] - 2
+        [1 3 1]
+        [1 2 2]
+        - [1 1 2] - 1
+        [1 1 3]
+        
+        k = 2
+        --- [1 1] ---
+        -- [2 1] --
+        - [3 1] -
+        [4 1]
+        [3 2]
+        - [2 2] -
 
-    n = 4
-    k = 5
-    --- [1 0 0 0 0] --- 5+4+3+2+1+4+3+2+1+3+2+1+2+1+1 = 5 + 4 * 2 + 3 * 3 + 2 + 4 + 1 + 5
-    -- [2 0 0 0 0] -- 5?
-    - [3 0 0 0 0] - 5
-    [4 0 0 0 0]
-    [3 1 0 0 0]
-    [3 0 1 0 0]
-    [3 0 0 1 0]
-    [3 0 0 0 1]
-        */
+    */
     fn possible_lines(&self) {
-        let num_stars = self.len - (self.hint.iter().sum::<u8>() as usize + self.hint.len() - 1);
-        let num_buckets = self.hint.len() + 1;
+        let num_stars = self.len - (self.damaged.iter().sum::<u8>() as usize + self.damaged.len() - 1);
+        let num_buckets = self.len - self.damaged.len();
 
         // Vector to keep the results
-        let lines: HashSet<String> = HashSet::new();
+        let lines: HashSet<Line> = HashSet::new();
 
         // Initialize stack with a bunch of vectors ([1 0 0], [0 1 0], [0 0 1])
         let mut stack: Vec<Vec<u8>> = vec![vec![0; num_buckets]];
 
-        while let Some(config) = stack.pop() {
+        while let Some(operational) = stack.pop() {
             // Base case
-            if config.iter().sum::<u8>() == num_stars as u8 {
+            if operational.iter().sum::<u8>() == num_stars as u8 {
                 // Convert config into string
                 // Add string to `lines` hash set
+                /// ??????   1, 1, 1
+                let first_condition = match operational.len().cmp(*self.damaged.len()) {
+                    Ordering::Greater => Condition::Operational,
+                    Ordering::Less => Condition::Operational,
+                    Ordering::Equal => 
+                }
+                lines.insert(Line::from_spring_data(
+                    self.damaged,
+                    operational,
+                    first_condition,
+                ))
             } else {
                 // For loop from 0 to num_buckets
                 // Increment config[i] by 1 and push a copy on the stack
@@ -99,7 +100,7 @@ impl Springs {
         }
 
         let base_line = self
-            .hint
+            .damaged
             .iter()
             .map(|&num| "#".repeat(num as usize))
             .collect::<Vec<String>>()
@@ -134,10 +135,10 @@ impl Springs {
         }
         println!(
             "{:?}",
-            self.hint.iter().sum::<u8>() as usize + self.hint.len()
+            self.damaged.iter().sum::<u8>() as usize + self.damaged.len()
         );
         println!("len: {:?}", self.len);
-        println!("hint: {:?}", self.hint);
+        println!("hint: {:?}", self.damaged);
         println!("num_stars: {}", num_stars);
     }
 }
@@ -164,13 +165,17 @@ impl FromStr for Springs {
             .split(',')
             .map(|s| s.parse::<u8>().unwrap())
             .collect();
-        Ok(Springs { line, hint, len })
+        Ok(Springs {
+            line,
+            damaged: hint,
+            len,
+        })
     }
 }
 
 impl fmt::Debug for Springs {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?} {:?}", self.line, self.hint)
+        write!(f, "{:?} {:?}", self.line, self.damaged)
     }
 }
 
@@ -179,6 +184,16 @@ enum Condition {
     Operational,
     Damaged,
     Unknown,
+}
+
+impl Condition {
+    fn opposite(&self) -> Self {
+        match self {
+            Condition::Operational => Condition::Damaged,
+            Condition::Damaged => Condition::Operational,
+            Condition::Unknown => panic!("Unknown doesn't have an opposite"),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -219,6 +234,37 @@ impl fmt::Debug for Condition {
 }
 
 struct Line(Vec<Condition>);
+
+impl Line {
+    /// Convert damaged and operational data into a combined line
+    /// damaged: [8,1,2,1]
+    /// operational: [3 1 1 1]
+    fn from_spring_data(
+        damaged: Vec<u8>,
+        operational: Vec<u8>,
+        first_condition: Condition,
+    ) -> Self {
+        let (mut first, mut second) = match first_condition {
+            Condition::Damaged => (VecDeque::from(damaged), VecDeque::from(operational)),
+            Condition::Operational => (VecDeque::from(operational), VecDeque::from(damaged)),
+            Condition::Unknown => panic!("Unknown is an incompatible condition type"),
+        };
+        let mut conditions: Vec<Condition> = Vec::new();
+        let mut current_condition = first_condition;
+
+        while !first.is_empty() {
+            conditions.extend((0..first.pop_front().unwrap()).map(|_| current_condition));
+            current_condition = current_condition.opposite();
+            if second.is_empty() {
+                break;
+            } else {
+                conditions.extend((0..second.pop_front().unwrap()).map(|_| current_condition));
+                current_condition = current_condition.opposite();
+            }
+        }
+        Self(conditions)
+    }
+}
 
 #[derive(Debug)]
 struct ParseLineError;
