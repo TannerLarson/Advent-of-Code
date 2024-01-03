@@ -3,19 +3,25 @@ use itertools::Itertools;
 use num_integer::binomial;
 use std::cmp::Ordering;
 use std::collections::VecDeque;
-use std::thread::current;
 use std::{collections::HashSet, str::FromStr};
 
 fn main() {
-    let input: Vec<Springs> = include_str!("ex2.txt")
+    let input: Vec<Springs> = include_str!("input.txt")
         .lines()
         .map(|line| line.parse().unwrap())
         .collect();
-    for springs in input {
-        println!("{:?}, {:?}", springs.line, springs.damaged);
-        springs.possible_lines();
-        println!()
-    }
+    // for springs in input {
+    //     println!("{:?}, {:?}", springs.line, springs.damaged);
+    //     springs.all_possible_lines();
+    //     println!()
+    // }
+    println!(
+        "Part 1: {}",
+        input
+            .iter()
+            .map(|springs| springs.all_possible_lines().len() as u32)
+            .sum::<u32>()
+    )
 }
 
 struct Springs {
@@ -35,111 +41,92 @@ impl Springs {
         binomial(n - 1, k)
     }
 
-    /*
-        ?#??#?##??.??? 7,1,1
-        sum_damaged = self.len
-        n = 5
-        k = 2, 3, 4
+    /// Account for all possible number of buckets
+    fn all_possible_lines(&self) -> HashSet<Line> {
+        let num_stars = self.len - self.damaged.iter().sum::<u8>() as usize;
+        let min_num_buckets = self.damaged.len() - 1;
+        let mut lines = self.possible_lines(num_stars, min_num_buckets);
+        if num_stars > min_num_buckets {
+            lines.extend(self.possible_lines(num_stars, min_num_buckets + 1))
+        }
+        if num_stars > min_num_buckets + 1 {
+            lines.extend(self.possible_lines(num_stars, min_num_buckets + 2))
+        }
+        lines
+            .iter()
+            .filter(|line| {
+                line.0
+                    .iter()
+                    .zip(self.line.0.iter())
+                    .all(|(con_l, con_r)| con_r == &Condition::Unknown || con_l == con_r)
+            })
+            .cloned()
+            .collect()
+    }
 
-        k = 4
-        [2 1 1 1]
-        [1 2 1 1]
-        [1 1 2 1]
-        [1 1 1 2]
-
-        k = 3
-        - [2 1 1] - 3
-        [3 1 1]
-        [2 2 1]
-        [2 1 2]
-        - [1 2 1] - 2
-        [1 3 1]
-        [1 2 2]
-        - [1 1 2] - 1
-        [1 1 3]
-        
-        k = 2
-        --- [1 1] ---
-        -- [2 1] --
-        - [3 1] -
-        [4 1]
-        [3 2]
-        - [2 2] -
-
-    */
-    fn possible_lines(&self) {
-        let num_stars = self.len - (self.damaged.iter().sum::<u8>() as usize + self.damaged.len() - 1);
-        let num_buckets = self.len - self.damaged.len();
-
+    // Get all possible lines for a specific number of buckets and stars
+    fn possible_lines(&self, num_stars: usize, num_buckets: usize) -> HashSet<Line> {
+        assert!(
+            num_stars >= num_buckets,
+            "num_stars ({}) must be >= num_buckets ({})",
+            num_stars,
+            num_buckets
+        );
         // Vector to keep the results
-        let lines: HashSet<Line> = HashSet::new();
+        let mut lines: HashSet<Line> = HashSet::new();
 
-        // Initialize stack with a bunch of vectors ([1 0 0], [0 1 0], [0 0 1])
-        let mut stack: Vec<Vec<u8>> = vec![vec![0; num_buckets]];
+        // Initialize stack with a bunch of vectors ([1 1 1], [1 1 1], [1 1 1])
+        let mut stack: Vec<Vec<u8>> = vec![vec![1; num_buckets]];
+        // println!("Stars: {:?}", num_stars);
+        // println!("Buckets: {:?}\n", num_buckets);
+        // println!("Stack: {:?}", stack);
+        // println!("Lines: {:?}", lines);
 
         while let Some(operational) = stack.pop() {
             // Base case
             if operational.iter().sum::<u8>() == num_stars as u8 {
-                // Convert config into string
-                // Add string to `lines` hash set
-                /// ??????   1, 1, 1
-                let first_condition = match operational.len().cmp(*self.damaged.len()) {
-                    Ordering::Greater => Condition::Operational,
-                    Ordering::Less => Condition::Operational,
-                    Ordering::Equal => 
+                match operational.len().cmp(&self.damaged.len()) {
+                    Ordering::Greater => {
+                        // println!("Operational: {:?}", operational);
+                        lines.insert(Line::from_spring_data(
+                            self.damaged.clone(),
+                            operational,
+                            Condition::Operational,
+                        ));
+                    }
+                    Ordering::Less => {
+                        // println!("Operational: {:?}", operational);
+                        lines.insert(Line::from_spring_data(
+                            self.damaged.clone(),
+                            operational,
+                            Condition::Damaged,
+                        ));
+                    }
+                    Ordering::Equal => {
+                        // println!("Operational: {:?}", operational);
+                        lines.insert(Line::from_spring_data(
+                            self.damaged.clone(),
+                            operational.clone(),
+                            Condition::Operational,
+                        ));
+                        lines.insert(Line::from_spring_data(
+                            self.damaged.clone(),
+                            operational,
+                            Condition::Damaged,
+                        ));
+                    }
                 }
-                lines.insert(Line::from_spring_data(
-                    self.damaged,
-                    operational,
-                    first_condition,
-                ))
             } else {
-                // For loop from 0 to num_buckets
-                // Increment config[i] by 1 and push a copy on the stack
-            }
-        }
-
-        let base_line = self
-            .damaged
-            .iter()
-            .map(|&num| "#".repeat(num as usize))
-            .collect::<Vec<String>>()
-            .join("|");
-        let insert_indexes: Vec<usize> = std::iter::once(0)
-            .chain(
-                base_line
-                    .chars()
-                    .enumerate()
-                    .filter_map(|(i, c)| (c == '|').then_some(i)),
-            )
-            .chain(std::iter::once(base_line.len()))
-            .collect();
-        println!("base: {}, indexes: {:?}", base_line, insert_indexes);
-
-        let mut current_line = base_line;
-        let mut possible_lines: Vec<String> = Vec::new();
-        for (i, insert_index) in insert_indexes.iter().enumerate() {
-            // Start by putting all our stars at the current insert index
-            current_line.insert_str(*insert_index, &"*".repeat(num_stars));
-            possible_lines.push(current_line.clone());
-            for _ in 0..num_stars {
-                current_line.remove(*insert_index);
-                for j in insert_indexes.iter().skip(i) {
-                    current_line.insert(*j, '.');
-                    println!("{:?}", current_line);
-                    possible_lines.push(current_line.clone());
-                    current_line.remove(*j);
+                for i in 0..num_buckets {
+                    let mut new_op = operational.clone();
+                    new_op[i] += 1;
+                    stack.push(new_op);
                 }
-                println!()
             }
+            // println!("Stack: {:?}", stack);
+            // println!("Lines: {:?}", lines);
         }
-        println!(
-            "{:?}",
-            self.damaged.iter().sum::<u8>() as usize + self.damaged.len()
-        );
-        println!("len: {:?}", self.len);
-        println!("hint: {:?}", self.damaged);
-        println!("num_stars: {}", num_stars);
+        lines
     }
 }
 
@@ -179,7 +166,7 @@ impl fmt::Debug for Springs {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 enum Condition {
     Operational,
     Damaged,
@@ -233,6 +220,7 @@ impl fmt::Debug for Condition {
     }
 }
 
+#[derive(PartialEq, Eq, Hash, Clone)]
 struct Line(Vec<Condition>);
 
 impl Line {
