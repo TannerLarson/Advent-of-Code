@@ -3,30 +3,29 @@ use itertools::Itertools;
 use num_integer::binomial;
 use std::cmp::Ordering;
 use std::collections::VecDeque;
+use std::time::Instant;
 use std::{collections::HashSet, str::FromStr};
 
 fn main() {
-    let input: Vec<Springs> = include_str!("input.txt")
+    let now = Instant::now();
+    let input: Vec<Springs> = include_str!("ex1.txt")
         .lines()
         .map(|line| line.parse().unwrap())
         .collect();
-    // for springs in input {
-    //     println!("{:?}, {:?}", springs.line, springs.damaged);
-    //     springs.all_possible_lines();
-    //     println!()
-    // }
     println!(
         "Part 1: {}",
         input
             .iter()
             .map(|springs| springs.all_possible_lines().len() as u32)
             .sum::<u32>()
-    )
+    );
+    let elapsed = now.elapsed();
+    println!("Elapsed: {:.2?}", elapsed)
 }
 
 struct Springs {
     line: Line,
-    damaged: Vec<u8>,
+    damaged: VecDeque<u8>,
     len: usize,
 }
 
@@ -75,45 +74,26 @@ impl Springs {
         // Vector to keep the results
         let mut lines: HashSet<Line> = HashSet::new();
 
-        // Initialize stack with a bunch of vectors ([1 1 1], [1 1 1], [1 1 1])
-        let mut stack: Vec<Vec<u8>> = vec![vec![1; num_buckets]];
-        // println!("Stars: {:?}", num_stars);
-        // println!("Buckets: {:?}\n", num_buckets);
-        // println!("Stack: {:?}", stack);
-        // println!("Lines: {:?}", lines);
+        // Initialize stack with single starting vector [[1 1 1]]
+        let mut stack: Vec<VecDeque<u8>> = vec![VecDeque::from(vec![1; num_buckets])];
 
         while let Some(operational) = stack.pop() {
+            // println!();
+            // println!("Stack: {:?}", stack);
+            // println!("Popped: {:?}", operational);
             // Base case
             if operational.iter().sum::<u8>() == num_stars as u8 {
+                // println!("Adding to results: {:?}", operational);
                 match operational.len().cmp(&self.damaged.len()) {
                     Ordering::Greater => {
-                        // println!("Operational: {:?}", operational);
-                        lines.insert(Line::from_spring_data(
-                            self.damaged.clone(),
-                            operational,
-                            Condition::Operational,
-                        ));
+                        lines.insert(self.build_line(operational, Condition::Operational));
                     }
                     Ordering::Less => {
-                        // println!("Operational: {:?}", operational);
-                        lines.insert(Line::from_spring_data(
-                            self.damaged.clone(),
-                            operational,
-                            Condition::Damaged,
-                        ));
+                        lines.insert(self.build_line(operational, Condition::Damaged));
                     }
                     Ordering::Equal => {
-                        // println!("Operational: {:?}", operational);
-                        lines.insert(Line::from_spring_data(
-                            self.damaged.clone(),
-                            operational.clone(),
-                            Condition::Operational,
-                        ));
-                        lines.insert(Line::from_spring_data(
-                            self.damaged.clone(),
-                            operational,
-                            Condition::Damaged,
-                        ));
+                        lines.insert(self.build_line(operational.clone(), Condition::Operational));
+                        lines.insert(self.build_line(operational, Condition::Damaged));
                     }
                 }
             } else {
@@ -123,10 +103,13 @@ impl Springs {
                     stack.push(new_op);
                 }
             }
-            // println!("Stack: {:?}", stack);
-            // println!("Lines: {:?}", lines);
         }
         lines
+    }
+
+    fn build_line(&self, operational: VecDeque<u8>, first_condition: Condition) -> Line {
+        // TODO: Change this so that self.damaged isn't cloned
+        Line::from_spring_data(self.damaged.clone(), operational, first_condition)
     }
 }
 
@@ -146,7 +129,7 @@ impl FromStr for Springs {
                 .map(|c| Condition::try_from(c).unwrap())
                 .collect_vec(),
         );
-        let hint: Vec<u8> = iter
+        let hint: VecDeque<u8> = iter
             .next()
             .unwrap()
             .split(',')
@@ -224,17 +207,14 @@ impl fmt::Debug for Condition {
 struct Line(Vec<Condition>);
 
 impl Line {
-    /// Convert damaged and operational data into a combined line
-    /// damaged: [8,1,2,1]
-    /// operational: [3 1 1 1]
     fn from_spring_data(
-        damaged: Vec<u8>,
-        operational: Vec<u8>,
+        damaged: VecDeque<u8>,
+        operational: VecDeque<u8>,
         first_condition: Condition,
     ) -> Self {
         let (mut first, mut second) = match first_condition {
-            Condition::Damaged => (VecDeque::from(damaged), VecDeque::from(operational)),
-            Condition::Operational => (VecDeque::from(operational), VecDeque::from(damaged)),
+            Condition::Damaged => (damaged, operational),
+            Condition::Operational => (operational, damaged),
             Condition::Unknown => panic!("Unknown is an incompatible condition type"),
         };
         let mut conditions: Vec<Condition> = Vec::new();
@@ -277,68 +257,3 @@ impl fmt::Debug for Line {
         write!(f, "{}", line_string)
     }
 }
-/*
-1, 3, 2: goal
-...##??: actual
-
-1. Compare minimum goal size to actual size
-
-We can guarantee actuals based on the difference between goal size and actual size. If the difference is x, we can guarantee y-x actuals where y is the goal number.
-
-2. Fill out guaranteed squares
-
-To find specifically which ones to fill out, start with a for loop over the goal numbers. Also keep track of the current actual index, with the index starting at -1.
-1. Increase the index by the current goal number
-2. Starting at the current index, fill out squares equal to the difference found previously backwards. So, if the current index is 6 and the difference is 2, fill out squares 6 and 5.
-3. Add one to the index to account for a single space in between the goal numbers
-
-3. Extrapolate current possibilities
-
----------------------------------------------------------------------------------------------
-
-STARS AND BARS METHOD
-
-| = Required blank
-* = Optional blank
-x = actual
-
-Assume a 15 x 15 grid
-
-3, 8
-xxx|xxxxxxxx
-
-***xxx|xxxxxxxx
-xxx***|xxxxxxxx / xxx|***xxxxxxxx
-xxx|xxxxxxxx***
-
-**xxx*|xxxxxxxx / **xxx|*xxxxxxxx
-**xxx|xxxxxxxx*
-
-*xxx**|xxxxxxxx / *xxx|**xxxxxxxx
-*xxx|xxxxxxxx**
-
-n = The number of additional gap cells (aka stars) we can distribute = 3
-k = The number of positions where we can place additional gap cells = 3
-
-
-??#?##????#???..? 8,1,2,1
-n = 2
-k = 5
-xxxxxxxx|x|xx|x
-
-**xxxxxxxx|x|xx|x
-*xxxxxxxx*|x|xx|x
-*xxxxxxxx|x*|xx|x
-*xxxxxxxx|x|xx*|x
-*xxxxxxxx|x|xx|x*
-xxxxxxxx**|x|xx|x
-xxxxxxxx*|x*|xx|x
-xxxxxxxx*|x|xx*|x
-xxxxxxxx*|x|xx|x*
-xxxxxxxx|x**|xx|x
-xxxxxxxx|x*|xx*|x
-xxxxxxxx|x*|xx|x*
-xxxxxxxx|x|xx**|x
-xxxxxxxx|x|xx*|x*
-xxxxxxxx|x|xx|x**
-*/
