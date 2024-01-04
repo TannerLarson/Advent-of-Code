@@ -7,8 +7,7 @@ use std::time::Instant;
 use std::{collections::HashSet, str::FromStr};
 
 fn main() {
-    let now = Instant::now();
-    let input: Vec<Springs> = include_str!("ex1.txt")
+    let input: Vec<Springs> = include_str!("ex2.txt")
         .lines()
         .map(|line| line.parse().unwrap())
         .collect();
@@ -19,6 +18,8 @@ fn main() {
             .map(|springs| springs.all_possible_lines().len() as u32)
             .sum::<u32>()
     );
+    let now = Instant::now();
+    println!("Part 2: {}", part_2(input));
     let elapsed = now.elapsed();
     println!("Elapsed: {:.2?}", elapsed)
 }
@@ -110,6 +111,40 @@ impl Springs {
     fn build_line(&self, operational: VecDeque<u8>, first_condition: Condition) -> Line {
         // TODO: Change this so that self.damaged isn't cloned
         Line::from_spring_data(self.damaged.clone(), operational, first_condition)
+    }
+
+    fn is_line_valid(&self, line: Line) -> bool {
+        let line_matches_spring_line = line
+            .0
+            .iter()
+            .zip(self.line.0.iter())
+            .all(|(a, b)| b == &Condition::Unknown || a == b);
+        if !line_matches_spring_line {
+            return false;
+        }
+        let mut damaged_it = self.damaged.iter();
+        let mut count: Option<u8> = None;
+        for cond in line.0 {
+            if count.is_none() && cond == Condition::Damaged {
+                if let Some(new_count) = damaged_it.next() {
+                    count = Some(*new_count)
+                } else {
+                    return false;
+                }
+            }
+            if count.is_some() {
+                if cond == Condition::Operational {
+                    return false;
+                } else if count == Some(0) {
+                    count = None;
+                } else {
+                    count.map(|n| n - 1);
+                }
+            }
+            println!("Cond: {:?}", cond);
+            println!("Count: {:?}\n", count);
+        }
+        damaged_it.next().is_none()
     }
 }
 
@@ -256,4 +291,15 @@ impl fmt::Debug for Line {
             .collect();
         write!(f, "{}", line_string)
     }
+}
+
+fn part_2(input: Vec<Springs>) -> u32 {
+    let x = input.first().unwrap().is_line_valid(Line(
+        ".###.##.#..."
+            .chars()
+            .map(|c| Condition::try_from(c).unwrap())
+            .collect(),
+    ));
+    println!("{}", x);
+    0
 }
