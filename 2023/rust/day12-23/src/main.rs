@@ -1,14 +1,13 @@
 use core::fmt;
 use itertools::Itertools;
 use num_integer::binomial;
-use std::cmp::Ordering;
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::time::Instant;
 use std::{collections::HashSet, str::FromStr};
 
 fn main() {
     let now = Instant::now();
-    let input: Vec<Springs> = include_str!("ex1.txt")
+    let input: Vec<Springs> = include_str!("input.txt")
         .lines()
         .map(|line| line.parse().unwrap())
         .collect();
@@ -51,16 +50,8 @@ impl Springs {
         if num_stars > min_num_buckets + 1 {
             lines.extend(self.possible_lines(num_stars, min_num_buckets + 2))
         }
+        // lines.iter().for_each(|line| println!("{:?}", line));
         lines
-            .iter()
-            .filter(|line| {
-                line.0
-                    .iter()
-                    .zip(self.line.0.iter())
-                    .all(|(con_l, con_r)| con_r == &Condition::Unknown || con_l == con_r)
-            })
-            .cloned()
-            .collect()
     }
 
     // Get all possible lines for a specific number of buckets and stars
@@ -71,27 +62,27 @@ impl Springs {
             num_stars,
             num_buckets
         );
-        // Vector to keep the results
-        let mut lines: HashSet<Line> = HashSet::new();
+
+        // Use a cache in order to skip over any duplicate calculations
+        let mut cache: HashMap<VecDeque<u8>, Vec<Line>> = HashMap::new();
 
         // Initialize stack with single starting vector [[1 1 1]]
         let mut stack: Vec<VecDeque<u8>> = vec![VecDeque::from(vec![1; num_buckets])];
 
         while let Some(operational) = stack.pop() {
+            if cache.contains_key(&operational) {
+                continue;
+            }
             // Base case
             if operational.iter().sum::<u8>() == num_stars as u8 {
-                match operational.len().cmp(&self.damaged.len()) {
-                    Ordering::Greater => {
-                        lines.insert(self.build_line(operational, Condition::Operational));
-                    }
-                    Ordering::Less => {
-                        lines.insert(self.build_line(operational, Condition::Damaged));
-                    }
-                    Ordering::Equal => {
-                        lines.insert(self.build_line(operational.clone(), Condition::Operational));
-                        lines.insert(self.build_line(operational, Condition::Damaged));
-                    }
+                let mut new_lines = Vec::new();
+                if operational.len() >= self.damaged.len() {
+                    new_lines.push(self.build_line(&operational, Condition::Operational))
                 }
+                if operational.len() <= self.damaged.len() {
+                    new_lines.push(self.build_line(&operational, Condition::Damaged))
+                }
+                cache.insert(operational.clone(), new_lines);
             } else {
                 for i in 0..num_buckets {
                     let mut new_op = operational.clone();
@@ -100,15 +91,19 @@ impl Springs {
                 }
             }
         }
-        lines
+        cache
+            .into_iter()
+            .flat_map(|(_, lines)| lines)
+            .filter(|line| self.is_line_valid(line))
+            .collect()
     }
 
-    fn build_line(&self, operational: VecDeque<u8>, first_condition: Condition) -> Line {
+    fn build_line(&self, operational: &VecDeque<u8>, first_condition: Condition) -> Line {
         // TODO: Change this so that self.damaged isn't cloned
-        Line::from_spring_data(self.damaged.clone(), operational, first_condition)
+        Line::from_spring_data(self.damaged.clone(), operational.clone(), first_condition)
     }
 
-    fn is_line_valid(&self, line: Line) -> bool {
+    fn is_line_valid(&self, line: &Line) -> bool {
         let line_matches_spring_line = line
             .0
             .iter()
@@ -119,8 +114,8 @@ impl Springs {
         }
         let mut damaged_it = self.damaged.iter();
         let mut count: Option<u8> = None;
-        for cond in line.0 {
-            if count.is_none() && cond == Condition::Damaged {
+        for cond in line.0.iter() {
+            if count.is_none() && cond == &Condition::Damaged {
                 if let Some(new_count) = damaged_it.next() {
                     count = Some(*new_count)
                 } else {
@@ -130,7 +125,7 @@ impl Springs {
             if count.is_some() {
                 if count == Some(0) {
                     count = None;
-                } else if cond == Condition::Operational {
+                } else if cond == &Condition::Operational {
                     return false;
                 } else {
                     count = count.map(|n| n - 1);
