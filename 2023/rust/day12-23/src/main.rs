@@ -84,6 +84,12 @@ impl Springs {
                 }
                 cache.insert(operational.clone(), new_lines);
             } else {
+                // Add an entry to the cache where the key is an invalid distribution
+                // The value should look up the entries in the cache that make up the current invalid distribution.
+                //   Combine these entries into a flattened vector of lines
+
+                // Think about how the stack will first extend and then resolve itself. Use the order in which the stack
+                //   pops to your advantage to build these more complex vectors of lines
                 for i in 0..num_buckets {
                     let mut new_op = operational.clone();
                     new_op[i] += 1;
