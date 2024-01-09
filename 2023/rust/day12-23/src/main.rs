@@ -5,11 +5,11 @@ use std::collections::{HashMap, VecDeque};
 use std::time::Instant;
 use std::{collections::HashSet, str::FromStr};
 
-// Last input run time: 11s
+// Last input run time: 10s
 
 fn main() {
     let now = Instant::now();
-    let input: Vec<Springs> = include_str!("ex1.txt")
+    let input: Vec<Springs> = include_str!("input.txt")
         .lines()
         .map(|line| line.parse().unwrap())
         .collect();
@@ -131,37 +131,10 @@ impl Springs {
     }
 
     fn is_line_valid(&self, line: &Line) -> bool {
-        let line_matches_spring_line = line
-            .0
+        line.0
             .iter()
             .zip(self.line.0.iter())
-            .all(|(a, b)| b == &Condition::Unknown || a == b);
-        if !line_matches_spring_line {
-            return false;
-        }
-        let mut damaged_it = self.damaged.iter();
-        let mut count: Option<u8> = None;
-        for cond in line.0.iter() {
-            if count.is_none() && cond == &Condition::Damaged {
-                if let Some(new_count) = damaged_it.next() {
-                    count = Some(*new_count)
-                } else {
-                    return false;
-                }
-            }
-            if count.is_some() {
-                if count == Some(0) {
-                    count = None;
-                } else if cond == &Condition::Operational {
-                    return false;
-                } else {
-                    count = count.map(|n| n - 1);
-                }
-            }
-            // println!("Cond: {:?}", cond);
-            // println!("Count: {:?}\n", count);
-        }
-        damaged_it.next().is_none()
+            .all(|(a, b)| b == &Condition::Unknown || a == b)
     }
 }
 
