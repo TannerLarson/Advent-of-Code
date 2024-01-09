@@ -1,11 +1,12 @@
 use core::fmt;
 use itertools::Itertools;
 use num_integer::binomial;
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
+use std::str::FromStr;
+use std::thread::current;
 use std::time::Instant;
-use std::{collections::HashSet, str::FromStr};
 
-// Last input run time: 10s
+// Last input run time: 2.37s
 
 fn main() {
     let now = Instant::now();
@@ -26,7 +27,7 @@ fn main() {
 
 struct Springs {
     line: Line,
-    damaged: VecDeque<u8>,
+    damaged: Vec<u8>,
     len: usize,
 }
 
@@ -65,11 +66,11 @@ impl Springs {
             num_buckets
         );
         // Cache key should be input, value should be output
-        let mut cache: HashMap<VecDeque<u8>, Vec<Line>> = HashMap::new();
+        let mut cache: HashMap<Vec<u8>, Vec<Line>> = HashMap::new();
         // stack should have a bunch of inputs
-        let mut stack: Vec<VecDeque<u8>> = Vec::new();
+        let mut stack: Vec<Vec<u8>> = Vec::new();
 
-        let starting_conf = VecDeque::from(vec![1; num_buckets]);
+        let starting_conf = vec![1; num_buckets];
         stack.push(starting_conf.clone());
 
         let now = Instant::now();
@@ -88,11 +89,11 @@ impl Springs {
                 if conf.len() <= self.damaged.len() {
                     new_lines.push(self.build_line(&conf, Condition::Damaged))
                 }
-                cache.insert(conf.clone(), new_lines);
+                cache.insert(conf.clone(), new_lines.into_iter().flatten().collect());
                 continue;
             }
             let branches = (0..num_buckets).map(|i| {
-                let mut new: VecDeque<u8> = VecDeque::new();
+                let mut new: Vec<u8> = Vec::new();
                 new.extend(conf.clone());
                 new[i] += 1;
                 new
@@ -108,26 +109,46 @@ impl Springs {
                 branches.for_each(|branch| stack.push(branch));
             }
         }
-        let elapsed = now.elapsed();
+        // let elapsed = now.elapsed();
         // println!("Elapsed a: {:.2?}", elapsed);
 
         let x = cache
             .get(&starting_conf)
             .unwrap()
             .iter()
-            .filter(|line| self.is_line_valid(line))
             .unique()
             .cloned()
             .collect();
-        let elapsed = now.elapsed();
+        // let elapsed = now.elapsed();
         // println!("Elapsed b: {:.2?}", elapsed);
 
         x
     }
 
-    fn build_line(&self, operational: &VecDeque<u8>, first_condition: Condition) -> Line {
-        // TODO: Change this so that self.damaged isn't cloned
-        Line::from_spring_data(self.damaged.clone(), operational.clone(), first_condition)
+    // Builds a Line object
+    fn build_line(&self, operational: &[u8], first_condition: Condition) -> Option<Line> {
+        let (it_first, it_second) = match first_condition {
+            Condition::Damaged => (self.damaged.iter(), operational.iter()),
+            Condition::Operational => (operational.iter(), self.damaged.iter()),
+            Condition::Unknown => panic!("Unknown is an incompatible condition type"),
+        };
+        // let mut conditions: Vec<Condition> = Vec::new();
+        let mut current_condition = first_condition;
+        let mut cond_it = self.line.0.iter();
+        let mut line_data = Vec::new();
+
+        for n in it_first.interleave(it_second) {
+            // Make sure line is valid
+            for _ in 0..*n {
+                let cond = cond_it.next();
+                if cond.is_none() || cond.unwrap() == &current_condition.opposite() {
+                    return None;
+                }
+            }
+            line_data.extend(vec![current_condition; *n as usize]);
+            current_condition = current_condition.opposite()
+        }
+        Some(Line(line_data))
     }
 
     fn is_line_valid(&self, line: &Line) -> bool {
@@ -154,7 +175,7 @@ impl FromStr for Springs {
                 .map(|c| Condition::try_from(c).unwrap())
                 .collect_vec(),
         );
-        let hint: VecDeque<u8> = iter
+        let hint: Vec<u8> = iter
             .next()
             .unwrap()
             .split(',')
@@ -230,34 +251,6 @@ impl fmt::Debug for Condition {
 
 #[derive(PartialEq, Eq, Hash, Clone)]
 struct Line(Vec<Condition>);
-
-impl Line {
-    fn from_spring_data(
-        damaged: VecDeque<u8>,
-        operational: VecDeque<u8>,
-        first_condition: Condition,
-    ) -> Self {
-        let (mut first, mut second) = match first_condition {
-            Condition::Damaged => (damaged, operational),
-            Condition::Operational => (operational, damaged),
-            Condition::Unknown => panic!("Unknown is an incompatible condition type"),
-        };
-        let mut conditions: Vec<Condition> = Vec::new();
-        let mut current_condition = first_condition;
-
-        while !first.is_empty() {
-            conditions.extend((0..first.pop_front().unwrap()).map(|_| current_condition));
-            current_condition = current_condition.opposite();
-            if second.is_empty() {
-                break;
-            } else {
-                conditions.extend((0..second.pop_front().unwrap()).map(|_| current_condition));
-                current_condition = current_condition.opposite();
-            }
-        }
-        Self(conditions)
-    }
-}
 
 #[derive(Debug)]
 struct ParseLineError;
