@@ -5,9 +5,11 @@ use std::collections::{HashMap, VecDeque};
 use std::time::Instant;
 use std::{collections::HashSet, str::FromStr};
 
+// Last input run time: 11s
+
 fn main() {
     let now = Instant::now();
-    let input: Vec<Springs> = include_str!("input.txt")
+    let input: Vec<Springs> = include_str!("ex1.txt")
         .lines()
         .map(|line| line.parse().unwrap())
         .collect();
@@ -40,7 +42,7 @@ impl Springs {
     }
 
     /// Account for all possible number of buckets
-    fn all_possible_lines(&self) -> HashSet<Line> {
+    fn all_possible_lines(&self) -> Vec<Line> {
         let num_stars = self.len - self.damaged.iter().sum::<u8>() as usize;
         let min_num_buckets = self.damaged.len() - 1;
         let mut lines = self.possible_lines(num_stars, min_num_buckets);
@@ -55,53 +57,72 @@ impl Springs {
     }
 
     // Get all possible lines for a specific number of buckets and stars
-    fn possible_lines(&self, num_stars: usize, num_buckets: usize) -> HashSet<Line> {
+    fn possible_lines(&self, num_stars: usize, num_buckets: usize) -> Vec<Line> {
         assert!(
             num_stars >= num_buckets,
             "num_stars ({}) must be >= num_buckets ({})",
             num_stars,
             num_buckets
         );
-
-        // Use a cache in order to skip over any duplicate calculations
+        // Cache key should be input, value should be output
         let mut cache: HashMap<VecDeque<u8>, Vec<Line>> = HashMap::new();
+        // stack should have a bunch of inputs
+        let mut stack: Vec<VecDeque<u8>> = Vec::new();
 
-        // Initialize stack with single starting vector [[1 1 1]]
-        let mut stack: Vec<VecDeque<u8>> = vec![VecDeque::from(vec![1; num_buckets])];
+        let starting_conf = VecDeque::from(vec![1; num_buckets]);
+        stack.push(starting_conf.clone());
 
-        while let Some(operational) = stack.pop() {
-            if cache.contains_key(&operational) {
+        let now = Instant::now();
+        while let Some(conf) = stack.pop() {
+            // println!("Stack: {:?} + {:?}", stack, conf);
+            // println!("Cache: {:?}\n", cache.keys());
+            if cache.contains_key(&conf) {
                 continue;
             }
             // Base case
-            if operational.iter().sum::<u8>() == num_stars as u8 {
+            if conf.iter().sum::<u8>() == num_stars as u8 {
                 let mut new_lines = Vec::new();
-                if operational.len() >= self.damaged.len() {
-                    new_lines.push(self.build_line(&operational, Condition::Operational))
+                if conf.len() >= self.damaged.len() {
+                    new_lines.push(self.build_line(&conf, Condition::Operational))
                 }
-                if operational.len() <= self.damaged.len() {
-                    new_lines.push(self.build_line(&operational, Condition::Damaged))
+                if conf.len() <= self.damaged.len() {
+                    new_lines.push(self.build_line(&conf, Condition::Damaged))
                 }
-                cache.insert(operational.clone(), new_lines);
+                cache.insert(conf.clone(), new_lines);
+                continue;
+            }
+            let branches = (0..num_buckets).map(|i| {
+                let mut new: VecDeque<u8> = VecDeque::new();
+                new.extend(conf.clone());
+                new[i] += 1;
+                new
+            });
+            if branches.clone().all(|branch| cache.contains_key(&branch)) {
+                let lines = branches
+                    .flat_map(|branch| cache.get(&branch).unwrap())
+                    .cloned()
+                    .collect_vec();
+                cache.insert(conf, lines);
             } else {
-                // Add an entry to the cache where the key is an invalid distribution
-                // The value should look up the entries in the cache that make up the current invalid distribution.
-                //   Combine these entries into a flattened vector of lines
-
-                // Think about how the stack will first extend and then resolve itself. Use the order in which the stack
-                //   pops to your advantage to build these more complex vectors of lines
-                for i in 0..num_buckets {
-                    let mut new_op = operational.clone();
-                    new_op[i] += 1;
-                    stack.push(new_op);
-                }
+                stack.push(conf.clone());
+                branches.for_each(|branch| stack.push(branch));
             }
         }
-        cache
-            .into_iter()
-            .flat_map(|(_, lines)| lines)
+        let elapsed = now.elapsed();
+        // println!("Elapsed a: {:.2?}", elapsed);
+
+        let x = cache
+            .get(&starting_conf)
+            .unwrap()
+            .iter()
             .filter(|line| self.is_line_valid(line))
-            .collect()
+            .unique()
+            .cloned()
+            .collect();
+        let elapsed = now.elapsed();
+        // println!("Elapsed b: {:.2?}", elapsed);
+
+        x
     }
 
     fn build_line(&self, operational: &VecDeque<u8>, first_condition: Condition) -> Line {
