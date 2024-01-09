@@ -7,20 +7,29 @@ use std::time::Instant;
 // Last input run time: 2.37s
 
 fn main() {
-    let now = Instant::now();
-    let input: Vec<Springs> = include_str!("input.txt")
+    // let now = Instant::now();
+    let mut input: Vec<Springs> = include_str!("ex2.txt")
         .lines()
         .map(|line| line.parse().unwrap())
         .collect();
-    println!(
-        "Part 1: {}",
-        input
-            .iter()
-            .map(|springs| springs.all_possible_lines().len() as u32)
-            .sum::<u32>()
-    );
-    let elapsed = now.elapsed();
-    println!("Elapsed: {:.2?}", elapsed)
+    // println!(
+    //     "Part 1: {}",
+    //     input
+    //         .iter()
+    //         .map(|springs| springs.all_possible_lines().len() as u32)
+    //         .sum::<u32>()
+    // );
+    input = input.iter().map(|springs| springs.unfolded()).collect();
+    println!("Unfolded: {:?}", input);
+    let ans = input
+        .iter()
+        .map(|springs| springs.unfolded())
+        .map(|springs| springs.all_possible_lines().len() as u32)
+        .sum::<u32>();
+    println!("Part 2: {}", ans)
+
+    // let elapsed = now.elapsed();
+    // println!("Elapsed: {:.2?}", elapsed)
 }
 
 struct Springs {
@@ -30,6 +39,21 @@ struct Springs {
 }
 
 impl Springs {
+    // "Unfold" input according to part 2
+    fn unfolded(&self) -> Self {
+        let mut l = self.line.0.clone();
+        l.push(Condition::Unknown);
+        let mut line = Line(std::iter::repeat(l).take(5).flatten().collect_vec());
+        line.0.pop();
+
+        let damaged = std::iter::repeat(self.damaged.clone())
+            .take(5)
+            .flatten()
+            .collect_vec();
+        let len = self.len * 5 + 4;
+        Self { line, damaged, len }
+    }
+
     /// Stars and Bars method
     /// n = Things I want to distribute
     /// k = Buckets to distribute across
