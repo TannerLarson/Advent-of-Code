@@ -1,9 +1,7 @@
 use core::fmt;
 use itertools::Itertools;
-use num_integer::binomial;
 use std::collections::HashMap;
 use std::str::FromStr;
-use std::thread::current;
 use std::time::Instant;
 
 // Last input run time: 2.37s
@@ -36,11 +34,11 @@ impl Springs {
     /// n = Things I want to distribute
     /// k = Buckets to distribute across
     /// If hint == [3, 8] and len == 15, then n = 3 (15 - 12) and k = 3 (before 3, between 3 and 8, after 8)
-    fn theoretical_num_configs(&self) -> u8 {
-        let n = self.len as u8 - (self.damaged.iter().sum::<u8>() + self.damaged.len() as u8 - 1);
-        let k = (self.len + 1) as u8;
-        binomial(n - 1, k)
-    }
+    // fn theoretical_num_configs(&self) -> u8 {
+    //     let n = self.len as u8 - (self.damaged.iter().sum::<u8>() + self.damaged.len() as u8 - 1);
+    //     let k = (self.len + 1) as u8;
+    //     binomial(n - 1, k)
+    // }
 
     /// Account for all possible number of buckets
     fn all_possible_lines(&self) -> Vec<Line> {
@@ -73,7 +71,6 @@ impl Springs {
         let starting_conf = vec![1; num_buckets];
         stack.push(starting_conf.clone());
 
-        let now = Instant::now();
         while let Some(conf) = stack.pop() {
             // println!("Stack: {:?} + {:?}", stack, conf);
             // println!("Cache: {:?}\n", cache.keys());
@@ -109,20 +106,14 @@ impl Springs {
                 branches.for_each(|branch| stack.push(branch));
             }
         }
-        // let elapsed = now.elapsed();
-        // println!("Elapsed a: {:.2?}", elapsed);
 
-        let x = cache
+        cache
             .get(&starting_conf)
             .unwrap()
             .iter()
             .unique()
             .cloned()
-            .collect();
-        // let elapsed = now.elapsed();
-        // println!("Elapsed b: {:.2?}", elapsed);
-
-        x
+            .collect()
     }
 
     // Builds a Line object
@@ -151,12 +142,12 @@ impl Springs {
         Some(Line(line_data))
     }
 
-    fn is_line_valid(&self, line: &Line) -> bool {
-        line.0
-            .iter()
-            .zip(self.line.0.iter())
-            .all(|(a, b)| b == &Condition::Unknown || a == b)
-    }
+    // fn is_line_valid(&self, line: &Line) -> bool {
+    //     line.0
+    //         .iter()
+    //         .zip(self.line.0.iter())
+    //         .all(|(a, b)| b == &Condition::Unknown || a == b)
+    // }
 }
 
 #[derive(Debug)]
