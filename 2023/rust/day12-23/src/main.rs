@@ -23,7 +23,6 @@ fn main() {
     println!("Unfolded: {:?}", input);
     let ans = input
         .iter()
-        .map(|springs| springs.unfolded())
         .map(|springs| springs.all_possible_lines().len() as u32)
         .sum::<u32>();
     println!("Part 2: {}", ans)
