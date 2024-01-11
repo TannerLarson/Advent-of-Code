@@ -8,7 +8,7 @@ use std::time::Instant;
 
 fn main() {
     let now = Instant::now();
-    let input: Vec<Springs> = include_str!("input.txt")
+    let input: Vec<Springs> = include_str!("ex2.txt")
         .lines()
         .map(|line| line.parse().unwrap())
         .collect();
@@ -144,7 +144,6 @@ impl Springs {
             Condition::Operational => (operational.iter(), self.damaged.iter()),
             Condition::Unknown => panic!("Unknown is an incompatible condition type"),
         };
-        // let mut conditions: Vec<Condition> = Vec::new();
         let mut current_condition = first_condition;
         let mut cond_it = self.line.0.iter();
         let mut line_data = Vec::new();
@@ -162,13 +161,6 @@ impl Springs {
         }
         Some(Line(line_data))
     }
-
-    // fn is_line_valid(&self, line: &Line) -> bool {
-    //     line.0
-    //         .iter()
-    //         .zip(self.line.0.iter())
-    //         .all(|(a, b)| b == &Condition::Unknown || a == b)
-    // }
 }
 
 #[derive(Debug)]
