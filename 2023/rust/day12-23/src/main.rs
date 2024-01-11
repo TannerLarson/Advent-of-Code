@@ -1,34 +1,34 @@
 use core::fmt;
 use itertools::Itertools;
-use std::collections::HashMap;
+use std::collections::HashSet;
 use std::str::FromStr;
 use std::time::Instant;
 
-// Last input run time: 2.37s
+// Last input run time: 524ms
 
 fn main() {
-    // let now = Instant::now();
-    let mut input: Vec<Springs> = include_str!("ex2.txt")
+    let now = Instant::now();
+    let input: Vec<Springs> = include_str!("input.txt")
         .lines()
         .map(|line| line.parse().unwrap())
         .collect();
-    // println!(
-    //     "Part 1: {}",
-    //     input
-    //         .iter()
-    //         .map(|springs| springs.all_possible_lines().len() as u32)
-    //         .sum::<u32>()
-    // );
-    input = input.iter().map(|springs| springs.unfolded()).collect();
-    println!("Unfolded: {:?}", input);
-    let ans = input
-        .iter()
-        .map(|springs| springs.all_possible_lines().len() as u32)
-        .sum::<u32>();
-    println!("Part 2: {}", ans)
+    println!(
+        "Part 1: {}",
+        input
+            .iter()
+            .map(|springs| springs.all_possible_lines() as u32)
+            .sum::<u32>()
+    );
+    // input = input.iter().map(|springs| springs.unfolded()).collect();
+    // println!("Unfolded: {:?}", input);
+    // let ans = input
+    //     .iter()
+    //     .map(|springs| springs.all_possible_lines().len() as u32)
+    //     .sum::<u32>();
+    // println!("Part 2: {}", ans)
 
-    // let elapsed = now.elapsed();
-    // println!("Elapsed: {:.2?}", elapsed)
+    let elapsed = now.elapsed();
+    println!("Elapsed: {:.2?}", elapsed)
 }
 
 struct Springs {
@@ -64,52 +64,56 @@ impl Springs {
     // }
 
     /// Account for all possible number of buckets
-    fn all_possible_lines(&self) -> Vec<Line> {
+    fn all_possible_lines(&self) -> usize {
         let num_stars = self.len - self.damaged.iter().sum::<u8>() as usize;
         let min_num_buckets = self.damaged.len() - 1;
-        let mut lines = self.possible_lines(num_stars, min_num_buckets);
+        let mut n = self.possible_lines(num_stars, min_num_buckets);
         if num_stars > min_num_buckets {
-            lines.extend(self.possible_lines(num_stars, min_num_buckets + 1))
+            n += self.possible_lines(num_stars, min_num_buckets + 1)
         }
         if num_stars > min_num_buckets + 1 {
-            lines.extend(self.possible_lines(num_stars, min_num_buckets + 2))
+            n += self.possible_lines(num_stars, min_num_buckets + 2)
         }
-        // lines.iter().for_each(|line| println!("{:?}", line));
-        lines
+        n
     }
 
     // Get all possible lines for a specific number of buckets and stars
-    fn possible_lines(&self, num_stars: usize, num_buckets: usize) -> Vec<Line> {
+    fn possible_lines(&self, num_stars: usize, num_buckets: usize) -> usize {
         assert!(
             num_stars >= num_buckets,
             "num_stars ({}) must be >= num_buckets ({})",
             num_stars,
             num_buckets
         );
-        // Cache key should be input, value should be output
-        let mut cache: HashMap<Vec<u8>, Vec<Line>> = HashMap::new();
+        // Cache should contain all the values we've already added to the total
+        let mut cache: HashSet<Vec<u8>> = HashSet::new();
         // stack should have a bunch of inputs
         let mut stack: Vec<Vec<u8>> = Vec::new();
+
+        let mut ans = 0;
 
         let starting_conf = vec![1; num_buckets];
         stack.push(starting_conf.clone());
 
         while let Some(conf) = stack.pop() {
             // println!("Stack: {:?} + {:?}", stack, conf);
-            // println!("Cache: {:?}\n", cache.keys());
-            if cache.contains_key(&conf) {
+            // println!("Cache: {:?}\n", cache);
+            if cache.contains(&conf) {
                 continue;
             }
             // Base case
             if conf.iter().sum::<u8>() == num_stars as u8 {
-                let mut new_lines = Vec::new();
-                if conf.len() >= self.damaged.len() {
-                    new_lines.push(self.build_line(&conf, Condition::Operational))
+                if conf.len() >= self.damaged.len()
+                    && self.build_line(&conf, Condition::Operational).is_some()
+                {
+                    ans += 1;
                 }
-                if conf.len() <= self.damaged.len() {
-                    new_lines.push(self.build_line(&conf, Condition::Damaged))
+                if conf.len() <= self.damaged.len()
+                    && self.build_line(&conf, Condition::Damaged).is_some()
+                {
+                    ans += 1;
                 }
-                cache.insert(conf.clone(), new_lines.into_iter().flatten().collect());
+                cache.insert(conf);
                 continue;
             }
             let branches = (0..num_buckets).map(|i| {
@@ -118,25 +122,19 @@ impl Springs {
                 new[i] += 1;
                 new
             });
-            if branches.clone().all(|branch| cache.contains_key(&branch)) {
-                let lines = branches
-                    .flat_map(|branch| cache.get(&branch).unwrap())
-                    .cloned()
-                    .collect_vec();
-                cache.insert(conf, lines);
+            if branches.clone().all(|branch| cache.contains(&branch)) {
+                cache.insert(conf.clone());
             } else {
                 stack.push(conf.clone());
-                branches.for_each(|branch| stack.push(branch));
+                branches.for_each(|branch| {
+                    if !cache.contains(&branch) {
+                        stack.push(branch)
+                    }
+                });
             }
         }
 
-        cache
-            .get(&starting_conf)
-            .unwrap()
-            .iter()
-            .unique()
-            .cloned()
-            .collect()
+        ans
     }
 
     // Builds a Line object
