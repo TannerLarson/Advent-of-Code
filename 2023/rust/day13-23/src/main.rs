@@ -1,15 +1,24 @@
 use core::fmt;
+use std::cmp::min;
 
 use grid::Grid;
 use itertools::Itertools;
 
 fn main() {
-    let input = include_str!("ex1.txt");
+    let input = include_str!("input.txt");
     let grids = input.split("\n\n").map(parse_grid).collect_vec();
-    print_grid(grids.first().unwrap())
+    // print_grid(grids.first().unwrap());
+    let ans = grids
+        .iter()
+        .map(|grid| match get_reflection_point(grid) {
+            Direction::Horizontal(i) => i as u32,
+            Direction::Vertical(i) => (i * 100) as u32,
+        })
+        .sum::<u32>();
+    println!("Part 1: {:?}", ans);
 }
 
-#[derive(Default)]
+#[derive(Default, PartialEq, Clone)]
 enum Object {
     #[default]
     Ash,
@@ -58,4 +67,43 @@ fn print_grid(grid: &Grid<Object>) {
         }
         println!()
     }
+}
+
+enum Direction {
+    Vertical(usize),
+    Horizontal(usize),
+}
+
+fn get_reflection_point(grid: &Grid<Object>) -> Direction {
+    if let Some(i) = vertical_reflection_point(grid) {
+        Direction::Horizontal(i)
+    } else {
+        println!("Hello");
+        let mut new_grid: Grid<Object> = grid.clone();
+        new_grid.rotate_left();
+        Direction::Vertical(vertical_reflection_point(&new_grid).unwrap())
+    }
+}
+
+// Gets the reflection point of a grid
+fn vertical_reflection_point(grid: &Grid<Object>) -> Option<usize> {
+    (1..grid.cols()).find(|&i| {
+        is_valid_reflection_point(grid.iter_row(0).collect(), i)
+            && grid
+                .iter_rows()
+                .skip(1)
+                .all(|row| is_valid_reflection_point(row.collect(), i))
+    })
+}
+
+fn is_valid_reflection_point(line: Vec<&Object>, point: usize) -> bool {
+    let l = &line[..point];
+    let r = &line[point..];
+    let shorter_len = min(l.len(), r.len());
+
+    l.iter()
+        .rev()
+        .take(shorter_len)
+        .zip(r.iter().take(shorter_len))
+        .all(|(l, r)| r == l)
 }
