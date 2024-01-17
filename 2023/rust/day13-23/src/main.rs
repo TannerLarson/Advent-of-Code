@@ -4,6 +4,9 @@ use std::cmp::min;
 use grid::Grid;
 use itertools::Itertools;
 
+/// 1. For each row, count the number of changes that would need to happen for each half to mirror the other
+/// 3. If that number ever goes above 1, return early
+
 fn main() {
     let input = include_str!("input.txt");
     let grids = input.split("\n\n").map(parse_grid).collect_vec();
@@ -75,25 +78,53 @@ enum Direction {
 }
 
 fn get_reflection_point(grid: &Grid<Object>) -> Direction {
-    if let Some(i) = vertical_reflection_point(grid) {
+    if let Some(i) = vertical_reflection_point(grid, 1) {
         Direction::Horizontal(i)
     } else {
-        println!("Hello");
         let mut new_grid: Grid<Object> = grid.clone();
         new_grid.rotate_left();
-        Direction::Vertical(vertical_reflection_point(&new_grid).unwrap())
+        Direction::Vertical(vertical_reflection_point(&new_grid, 1).unwrap())
     }
 }
 
-// Gets the reflection point of a grid
-fn vertical_reflection_point(grid: &Grid<Object>) -> Option<usize> {
-    (1..grid.cols()).find(|&i| {
-        is_valid_reflection_point(grid.iter_row(0).collect(), i)
-            && grid
-                .iter_rows()
-                .skip(1)
-                .all(|row| is_valid_reflection_point(row.collect(), i))
-    })
+// // Gets the reflection point of a grid
+// fn vertical_reflection_point(grid: &Grid<Object>) -> Option<usize> {
+//     (1..grid.cols()).find(|&i| {
+//         is_valid_reflection_point(grid.iter_row(0).collect(), i)
+//             && grid
+//                 .iter_rows()
+//                 .skip(1)
+//                 .all(|row| is_valid_reflection_point(row.collect(), i))
+//     })
+// }
+
+fn vertical_reflection_point(grid: &Grid<Object>, expected_diffs: usize) -> Option<usize> {
+    for i in 1..grid.cols() {
+        let mut num_changes = 0;
+        let mut j = 0;
+        while num_changes <= 1 && j < grid.rows() {
+            num_changes +=
+                num_changes_necessary_to_be_valid_reflection_point(grid.iter_row(j).collect(), i);
+            j += 1;
+        }
+        if num_changes == expected_diffs {
+            return Some(i);
+        }
+    }
+    None
+}
+
+fn num_changes_necessary_to_be_valid_reflection_point(line: Vec<&Object>, point: usize) -> usize {
+    let l = &line[..point];
+    let r = &line[point..];
+    let shorter_len = min(l.len(), r.len());
+
+    l.iter()
+        .rev()
+        .take(shorter_len)
+        .zip(r.iter().take(shorter_len))
+        .filter(|(l, r)| r != l)
+        .count()
 }
 
 fn is_valid_reflection_point(line: Vec<&Object>, point: usize) -> bool {
