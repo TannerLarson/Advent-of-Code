@@ -2,10 +2,19 @@ use grid::Grid;
 use itertools::{sorted, Itertools};
 
 fn main() {
-    println!("Hello, world!");
+    let input = include_str!("ex1.txt");
+    let num_cols = input.lines().next().unwrap().len();
+    let grid = Grid::from_vec(
+        input
+            .lines()
+            .flat_map(|line| line.chars().map(Rock::from))
+            .collect_vec(),
+        num_cols,
+    );
+    print_grid(&grid)
 }
 
-#[derive(PartialEq, Clone, PartialOrd, Eq, Ord)]
+#[derive(PartialEq, Clone, Copy, PartialOrd, Eq, Ord)]
 enum Rock {
     Empty,
     Round,
@@ -71,5 +80,14 @@ impl Platform {
         }
 
         Grid::from_vec(tilted, self.0.cols())
+    }
+}
+
+fn print_grid(grid: &Grid<Rock>) {
+    for row in grid.iter_rows() {
+        for rock in row {
+            print!("{:?} ", char::from(*rock))
+        }
+        println!()
     }
 }
