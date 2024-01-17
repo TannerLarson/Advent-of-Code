@@ -171,6 +171,7 @@ dependencies = [
 name = "day14-23"
 version = "0.1.0"
 dependencies = [
+ "grid",
  "itertools 0.12.0",
 ]
 
