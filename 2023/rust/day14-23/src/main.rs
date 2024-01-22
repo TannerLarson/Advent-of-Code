@@ -16,11 +16,11 @@ fn main() {
     let tilted = &platform.tilted(Direction::North);
     println!("Part 1: {}", tilted.get_load(Direction::North));
 
-    platform.spin(1);
+    platform.spin(3);
     println!("Part 2: {}", platform.get_load(Direction::North))
 }
 
-#[derive(PartialEq, Clone, Copy, PartialOrd, Eq, Ord)]
+#[derive(PartialEq, Clone, Copy, PartialOrd, Eq, Ord, Debug)]
 enum Rock {
     Empty,
     Round,
@@ -109,12 +109,14 @@ impl Platform {
         for i_rotation in 0..(num_cycles * 4) {
             let (dir, it_i_line) = match i_rotation % 4 {
                 0 => (Direction::North, 0..self.0.cols()),
-                1 => (Direction::East, 0..self.0.rows()),
+                1 => (Direction::West, 0..self.0.rows()),
                 2 => (Direction::South, 0..self.0.cols()),
-                3 => (Direction::West, 0..self.0.rows()),
+                3 => (Direction::East, 0..self.0.rows()),
                 _ => panic!("At the disco: {}", i_rotation % 4),
             };
             println!("Direction: {:?}", dir);
+
+            // TODO: This is broken in the case where the last element is a cube
 
             for i_line in it_i_line {
                 // The idea here is to have two indexes, i_counter and i_updater
@@ -122,29 +124,68 @@ impl Platform {
                 // i_updater will wait for i_counter to find a Cube rock. Once it does, it will update the values
                 //   up to i_counter according to the number of round rocks found
                 // Once i_updater has caught up to i_counter, reset num_round.
-                let mut num_round = 0;
-                let mut counter_updater_diff = 0;
+                let mut it_counter_coords = self.directional_range(dir, i_line).peekable();
+                let mut it_updater_coords = self.directional_range(dir, i_line);
+                let next = it_counter_coords.next().unwrap();
+                let mut num_round = match self.0.get(next.0, next.1) {
+                    Some(Rock::Round) => 1,
+                    _ => 0,
+                };
+                let mut counter_updater_diff = 1;
 
-                for counter_coord in self.directional_range(dir, i_line) {
-                    let mut it_updater_coord = self.directional_range(dir, i_line);
+                while let Some(counter_coord) = it_counter_coords.next() {
+                    counter_updater_diff += 1;
                     let rock_at_counter = self.0.get(counter_coord.0, counter_coord.1);
-                    if rock_at_counter.is_none() || *rock_at_counter.unwrap() == Rock::Cube {
-                        // Use i_updater to update grid
-                        for _ in 0..counter_updater_diff {
-                            let i_updater = it_updater_coord.next().unwrap();
-                            if counter_coord.0.abs_diff(i_updater.0) <= num_round
-                                && counter_coord.1.abs_diff(i_updater.1) <= num_round
-                            {
-                                *self.0.get_mut(i_updater.0, i_updater.1).unwrap() = Rock::Round
-                            } else {
-                                *self.0.get_mut(i_updater.0, i_updater.1).unwrap() = Rock::Empty
-                            }
-                        }
-                        counter_updater_diff = 0;
-                    } else if *rock_at_counter.unwrap() == Rock::Round {
+                    // println!(
+                    //     "counter: ({}, {}): {}",
+                    //     counter_coord.0,
+                    //     counter_coord.1,
+                    //     char::from(*rock_at_counter.unwrap_or(&Rock::Empty))
+                    // );
+                    if *rock_at_counter.unwrap() == Rock::Round {
                         num_round += 1;
                     }
-                    counter_updater_diff += 1
+                    if it_counter_coords.peek().is_none() || *rock_at_counter.unwrap() == Rock::Cube
+                    {
+                        // TODO: We need to do something special for when we are at the end of it_counter_coords
+                        // Use i_updater to update grid
+                        let range = if it_counter_coords.peek().is_none()
+                            && *rock_at_counter.unwrap() != Rock::Cube
+                        {
+                            0..counter_updater_diff
+                        } else {
+                            0..(counter_updater_diff - 1)
+                        };
+
+                        for i in range.clone() {
+                            let updater_coord = it_updater_coords.next().unwrap();
+                            let rock_at_updater =
+                                self.0.get_mut(updater_coord.0, updater_coord.1).unwrap();
+                            if *rock_at_updater == Rock::Cube {
+                                continue;
+                            } else if i >= range.len() - num_round {
+                                // println!(
+                                //     "Updating: ({}, {}): {} to round {}",
+                                //     updater_coord.0,
+                                //     updater_coord.1,
+                                //     char::from(*rock_at_updater),
+                                //     i
+                                // );
+                                *rock_at_updater = Rock::Round
+                            } else {
+                                // println!(
+                                //     "Updating: ({}, {}): {} to empty {}",
+                                //     updater_coord.0,
+                                //     updater_coord.1,
+                                //     char::from(*rock_at_updater),
+                                //     i
+                                // );
+                                *rock_at_updater = Rock::Empty
+                            }
+                        }
+                        counter_updater_diff = 1;
+                        num_round = 0;
+                    }
                 }
             }
             print_grid(&self.0);
