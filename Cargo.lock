@@ -180,6 +180,14 @@ name = "day15-23"
 version = "0.1.0"
 
 [[package]]
+name = "day16-23"
+version = "0.1.0"
+dependencies = [
+ "grid",
+ "itertools 0.12.0",
+]
+
+[[package]]
 name = "day2-22"
 version = "0.1.0"
 
