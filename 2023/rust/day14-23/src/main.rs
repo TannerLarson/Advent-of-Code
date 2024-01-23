@@ -1,13 +1,11 @@
 use core::panic;
+use std::iter::Cycle;
 
 use grid::Grid;
 use itertools::Itertools;
 
-// Can do 10000 cycles in a second or two (That's 100000 x less than the goal)
-// TODO: Use Wes' advice
-
 fn main() {
-    let input = include_str!("ex1.txt");
+    let input = include_str!("input.txt");
     let num_cols = input.lines().next().unwrap().len();
     let mut platform = Platform(Grid::from_vec(
         input
@@ -17,10 +15,10 @@ fn main() {
         num_cols,
     ));
     platform.tilt(Direction::North);
-    println!("Part 1: {}", platform.get_load(Direction::North));
+    println!("Part 1: {}", get_grid_load(&platform.0));
 
-    platform.spin(10000);
-    println!("Part 2: {}", platform.get_load(Direction::North))
+    platform.spin(1000000000);
+    println!("Part 2: {}", get_grid_load(&platform.0));
 }
 
 #[derive(PartialEq, Clone, Copy, PartialOrd, Eq, Ord, Debug)]
@@ -51,7 +49,7 @@ impl From<Rock> for char {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 enum Direction {
     North,
     West,
@@ -59,6 +57,7 @@ enum Direction {
     East,
 }
 
+#[derive(Clone)]
 struct Platform(Grid<Rock>);
 
 impl Platform {
@@ -132,8 +131,7 @@ impl Platform {
     }
 
     fn spin(&mut self, num_cycles: usize) {
-        // println!("Start");
-        // print_grid(&self.0);
+        let mut states: Vec<(Direction, Grid<Rock>)> = Vec::new();
         for i_rotation in 0..(num_cycles * 4) {
             let dir = match i_rotation % 4 {
                 0 => Direction::North,
@@ -142,27 +140,32 @@ impl Platform {
                 3 => Direction::East,
                 _ => panic!("At the disco: {}", i_rotation % 4),
             };
-            // println!("Direction: {:?}", dir);
 
-            self.tilt(dir)
-            // print_grid(&self.0);
+            self.tilt(dir);
+
+            if let Some(pos) = states.iter().position(|x| x.0 == dir && x.1 == self.0) {
+                let cycle = states.iter().skip(pos).collect_vec();
+                let test = cycle
+                    .iter()
+                    .map(|(_, grid)| (grid, get_grid_load(grid)))
+                    .collect_vec();
+                let i_result = (num_cycles * 4 - i_rotation) % cycle.len() - 1;
+                self.0 = cycle.get(i_result).unwrap().1.clone();
+                return;
+            }
+
+            states.push((dir, self.0.clone()));
         }
     }
+}
 
-    fn get_load(&self, dir: Direction) -> usize {
-        let mut grid = self.0.clone();
-        // Orient grid so the selected direction is pointing south
-        match dir {
-            Direction::East => grid.rotate_right(),
-            Direction::North => grid.rotate_half(),
-            Direction::West => grid.rotate_left(),
-            _ => (),
-        }
-        grid.iter_rows()
-            .enumerate()
-            .map(|(i, rocks)| rocks.filter(|&&rock| rock == Rock::Round).count() * (i + 1))
-            .sum()
-    }
+fn get_grid_load(grid: &Grid<Rock>) -> usize {
+    grid.iter_rows()
+        .enumerate()
+        .map(|(i, it_rocks)| {
+            it_rocks.filter(|rock| **rock == Rock::Round).count() * (grid.rows() - i)
+        })
+        .sum()
 }
 
 fn print_grid(grid: &Grid<Rock>) {
