@@ -6,54 +6,90 @@ use std::collections::{HashMap, HashSet};
 fn main() {
     let input_grid = Grid::from_str(include_str!("ex1.txt"));
     let (rows, cols) = (input_grid.rows(), input_grid.cols());
-    let mut contraption = Contraption(input_grid, Grid::new(rows, cols));
-    println!("Part 1: {}", contraption.get_num_energized());
-    contraption.0.print();
+    let mut contraption = Contraption {
+        grid: input_grid,
+        energized: Grid::new(rows, cols),
+    };
+    println!(
+        "Part 1: {}",
+        contraption.get_num_energized(Coord::new(0, 0), Direction::East)
+    );
+    println!("Part 2: {}", contraption.get_max_energized());
 }
 
-struct Contraption(Grid<Part>, Grid<HashMap<Direction, HashSet<Coord>>>);
+struct Contraption {
+    grid: Grid<Part>,
+    energized: Grid<HashMap<Direction, HashSet<Coord>>>,
+}
 
 impl Contraption {
-    fn get_max_energized(grid: &Grid<Part>) -> usize {
+    fn get_max_energized(&mut self) -> u32 {
         // Use the `Loop` struct to record all coordinates and directions for each part of the loop
         // How do I build the loop?
         // When I hit the `continue` part of `get_num_energized`, I know I've reached a loop
         // I could associate a numerical value with each coord/direction pair that equals the number energized at that point
-        4
-    }
 
-    // If next values are either None or we have already visited them at the proper direction
-    fn can_calculate_next_value(&self, next_coords: &[(Option<Coord>, Direction)]) -> bool {
-        next_coords.iter().all(|(next_coord, next_dir)| {
-            next_coord.is_none()
-                || self
-                    .1
-                    .get_at_coord(&next_coord.unwrap())
-                    .unwrap()
-                    .contains_key(next_dir)
-        })
+        self.get_num_energized(Coord::new(2, 0), Direction::East);
+
+        // let west = (0..(self.grid.rows()))
+        //     .map(|i| self.get_num_energized(Coord::new(i, 0), Direction::East))
+        //     .max()
+        //     .unwrap();
+        // println!("West: {}", west);
+        // let east = (0..(self.grid.rows()))
+        //     .map(|i| self.get_num_energized(Coord::new(i, self.grid.cols() - 1), Direction::West))
+        //     .max()
+        //     .unwrap();
+        // println!("East: {}", east);
+        // let north = (0..(self.grid.cols()))
+        //     .map(|i| self.get_num_energized(Coord::new(0, i), Direction::South))
+        //     .max()
+        //     .unwrap();
+        // println!("North: {}", north);
+        // let south = (0..(self.grid.cols()))
+        //     .map(|i| self.get_num_energized(Coord::new(self.grid.rows() - 1, i), Direction::North))
+        //     .max()
+        //     .unwrap();
+        // println!("South: {}", south);
+        // *[west, east, north, south].iter().max().unwrap()
+        4
     }
 
     // If we have already visited the coord in the defined direction and the value at that coord and direction is zero
     fn already_visited(&self, coord: &Coord, dir: &Direction) -> bool {
-        let set = self.1.get_at_coord(coord);
-        set.is_some() && self.1.get_at_coord(coord).unwrap().contains_key(dir)
+        let set = self.energized.get_at_coord(coord);
+        set.is_some()
+            && self
+                .energized
+                .get_at_coord(coord)
+                .unwrap()
+                .contains_key(dir)
     }
 
-    fn set_value_at_coord(
-        &mut self,
+    // If we can calculate the current coords child coords, do so. Otherwise, return None
+    fn collect_child_coords(
+        &self,
         coord: Coord,
-        dir: Direction,
         next_coords: &[(Option<Coord>, Direction)],
-    ) {
+    ) -> Option<HashSet<Coord>> {
+        if !next_coords.iter().all(|(next_coord, next_dir)| {
+            next_coord.is_none()
+                || self
+                    .energized
+                    .get_at_coord(&next_coord.unwrap())
+                    .unwrap()
+                    .contains_key(next_dir)
+        }) {
+            return None;
+        }
         // Iterator over HashSets of next coordinates
-        let combined_set: HashSet<Coord> = next_coords
+        let mut combined_set: HashSet<Coord> = next_coords
             .iter()
             .filter_map(|(next_coord, next_dir)| {
                 if next_coord.is_some() {
-                    let map = self.1.get_at_coord(&next_coord.unwrap()).unwrap();
+                    let map = self.energized.get_at_coord(&next_coord.unwrap()).unwrap();
                     if map.contains_key(next_dir) {
-                        Some(map.get(&dir).unwrap().clone())
+                        Some(map.get(next_dir).unwrap().clone())
                     } else {
                         None
                     }
@@ -63,33 +99,26 @@ impl Contraption {
             })
             .flatten()
             .collect();
-        let len = combined_set.len();
-        *self
-            .1
-            .get_at_coord_mut(&coord)
-            .unwrap()
-            .entry(dir)
-            .or_default() = combined_set;
-        println!("Calculated value: {}", len);
+        combined_set.insert(coord);
+        Some(combined_set)
     }
 
-    fn get_num_energized(&mut self) -> u32 {
+    fn get_num_energized(&mut self, start_coord: Coord, start_dir: Direction) -> u32 {
         // TODO: I need to be able to calculate the current coordinate value based on previously visited coordinates
         // The current coordinate value equals the sum of the values the current coordinate points to plus 1
         // We need to record the value for each coordinate in each direction
-        let mut stack = vec![(Coord::new(0, 0), Direction::East)];
+        println!("{:?} {:?}", start_coord, start_dir);
+        let mut loops = 9;
+        let mut stack = vec![(start_coord, start_dir)];
         while let Some((coord, dir)) = stack.pop() {
             println!("{:?}", coord);
             // Check if we can calculate the current coordinate's value
             let next_coords = self.get_next_coords(coord, dir);
-            if self.can_calculate_next_value(&next_coords) {
-                self.set_value_at_coord(coord, dir, &next_coords);
-                continue;
+            let set = if let Some(collected_set) = self.collect_child_coords(coord, &next_coords) {
+                println!("Calculated: {}", collected_set.len());
+                collected_set
             } else {
-                println!("Pushing coords");
-                // Push current coord
                 stack.push((coord, dir));
-                // Push next coord(s)
                 for (next_coord, next_dir) in next_coords {
                     if let Some(next_coord) = next_coord {
                         if !self.already_visited(&next_coord, &next_dir) {
@@ -97,43 +126,38 @@ impl Contraption {
                         }
                     }
                 }
-            }
 
-            let dirs = self.1.get_at_coord_mut(&coord).unwrap();
-            if dirs.contains_key(&dir) {
-                // We have found a loop
-                // This is getting in the way of adding. When we find the base case and go back one, it thinks
-                // we have found a loop and doesn't add the base case
-                println!("Loop found");
+                let mut collected_set = HashSet::new();
+                collected_set.insert(coord);
+                collected_set
+            };
+
+            let dirs = self.energized.get_at_coord_mut(&coord).unwrap();
+            if ([Direction::East, Direction::West].contains(&dir))
+                && *self.grid.get_at_coord(&coord).unwrap() == Part::VSplitter
+            {
+                dirs.insert(Direction::East, set.clone());
+                dirs.insert(Direction::West, set);
+            } else if ([Direction::North, Direction::South].contains(&dir))
+                && *self.grid.get_at_coord(&coord).unwrap() == Part::HSplitter
+            {
+                dirs.insert(Direction::North, set.clone());
+                dirs.insert(Direction::South, set);
             } else {
-                // Add a new direction(s) at the current coordinate
-                let mut set = HashSet::new();
-                set.insert(coord);
-                if ([Direction::East, Direction::West].contains(&dir))
-                    && *self.0.get_at_coord(&coord).unwrap() == Part::VSplitter
-                {
-                    dirs.insert(Direction::East, set.clone());
-                    dirs.insert(Direction::West, set);
-                } else if ([Direction::North, Direction::South].contains(&dir))
-                    && *self.0.get_at_coord(&coord).unwrap() == Part::HSplitter
-                {
-                    dirs.insert(Direction::North, set.clone());
-                    dirs.insert(Direction::South, set);
-                } else {
-                    dirs.insert(dir, set);
-                }
+                dirs.insert(dir, set);
             }
         }
-        self.1
-            .get(0, 0)
+        dbg!(self
+            .energized
+            .get_at_coord(&start_coord)
             .unwrap()
-            .get(&Direction::East)
+            .get(&start_dir)
             .unwrap()
-            .len() as u32
+            .len() as u32)
     }
 
     fn get_next_coords(&self, coord: Coord, dir: Direction) -> Vec<(Option<Coord>, Direction)> {
-        match self.0.get_at_coord(&coord).unwrap() {
+        match self.grid.get_at_coord(&coord).unwrap() {
             Part::FMirror => {
                 let new_dir = match dir {
                     Direction::North => Direction::East,
@@ -141,7 +165,7 @@ impl Contraption {
                     Direction::South => Direction::West,
                     Direction::West => Direction::South,
                 };
-                vec![(self.0.relative_coord(&coord, &new_dir), new_dir)]
+                vec![(self.grid.relative_coord(&coord, &new_dir), new_dir)]
             }
             Part::BMirror => {
                 let new_dir = match dir {
@@ -150,21 +174,21 @@ impl Contraption {
                     Direction::East => Direction::South,
                     Direction::South => Direction::East,
                 };
-                vec![(self.0.relative_coord(&coord, &new_dir), new_dir)]
+                vec![(self.grid.relative_coord(&coord, &new_dir), new_dir)]
             }
             Part::HSplitter => {
                 let mut coords = Vec::new();
                 if let Direction::North | Direction::South = dir {
                     coords.push((
-                        self.0.relative_coord(&coord, &Direction::West),
+                        self.grid.relative_coord(&coord, &Direction::West),
                         Direction::West,
                     ));
                     coords.push((
-                        self.0.relative_coord(&coord, &Direction::East),
+                        self.grid.relative_coord(&coord, &Direction::East),
                         Direction::East,
                     ));
                 } else {
-                    coords.push((self.0.relative_coord(&coord, &dir), dir))
+                    coords.push((self.grid.relative_coord(&coord, &dir), dir))
                 }
                 coords
             }
@@ -172,20 +196,20 @@ impl Contraption {
                 let mut coords = Vec::new();
                 if let Direction::East | Direction::West = dir {
                     coords.push((
-                        self.0.relative_coord(&coord, &Direction::North),
+                        self.grid.relative_coord(&coord, &Direction::North),
                         Direction::North,
                     ));
                     coords.push((
-                        self.0.relative_coord(&coord, &Direction::South),
+                        self.grid.relative_coord(&coord, &Direction::South),
                         Direction::South,
                     ));
                 } else {
-                    coords.push((self.0.relative_coord(&coord, &dir), dir))
+                    coords.push((self.grid.relative_coord(&coord, &dir), dir))
                 }
                 coords
             }
             Part::Empty => {
-                vec![(self.0.relative_coord(&coord, &dir), dir)]
+                vec![(self.grid.relative_coord(&coord, &dir), dir)]
             }
         }
     }
