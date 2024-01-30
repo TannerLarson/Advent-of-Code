@@ -4,30 +4,21 @@ use grid::Grid;
 // This module extends the functionality of the grid crate with some functions I often use when working with grids
 
 pub trait GridExt<T> {
-    fn print(&self);
-    fn from_str(string: &str) -> Grid<T>;
+    fn from_str(string: &str) -> Self
+    where
+        Self: Sized,
+        T: From<char>;
     fn get_at_coord(&self, coord: &Coord) -> Option<&T>;
     fn get_at_coord_mut(&mut self, coord: &Coord) -> Option<&mut T>;
     fn relative_coord(&self, coord: &Coord, dir: &Direction) -> Option<Coord>;
 }
 
-// The `where` clause forces any T to implement the defined traits
-impl<T> GridExt<T> for Grid<T>
-where
-    T: fmt::Debug,
-    T: From<char>,
-{
-    fn print(&self) {
-        for row in self.iter_rows() {
-            for item in row {
-                print!("{:?} ", item)
-            }
-            println!()
-        }
-        println!()
-    }
-
-    fn from_str(string: &str) -> Grid<T> {
+impl<T> GridExt<T> for Grid<T> {
+    fn from_str(string: &str) -> Grid<T>
+    where
+        Self: Sized,
+        T: From<char>,
+    {
         Grid::from_vec(
             string
                 .lines()
@@ -64,6 +55,40 @@ where
     }
 }
 
+// This is a supertrait. It's here so we can put all methods that require T to implement fmt::Debug in one place nice and clean
+pub trait GridDisplay<T>: GridExt<T>
+where
+    T: fmt::Debug,
+{
+    fn print(&self);
+    fn print_with_spacing(&self, spacing: usize);
+}
+
+impl<T> GridDisplay<T> for Grid<T>
+where
+    T: fmt::Debug,
+{
+    fn print(&self) {
+        for row in self.iter_rows() {
+            for item in row {
+                print!("{:?}", item)
+            }
+            println!()
+        }
+        println!()
+    }
+
+    fn print_with_spacing(&self, spacing: usize) {
+        for row in self.iter_rows() {
+            for item in row {
+                print!("{:width$?}", item, width = spacing)
+            }
+            println!()
+        }
+        println!()
+    }
+}
+
 #[derive(PartialEq, Eq, Hash, Clone, Copy)]
 pub struct Coord {
     row: usize,
@@ -82,7 +107,7 @@ impl fmt::Debug for Coord {
     }
 }
 
-#[derive(PartialEq, Eq, Hash, Clone, Copy)]
+#[derive(PartialEq, Eq, Hash, Clone, Copy, Debug)]
 pub enum Direction {
     North,
     East,
