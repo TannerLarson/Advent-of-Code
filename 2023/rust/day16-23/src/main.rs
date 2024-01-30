@@ -57,8 +57,7 @@ impl Contraption {
 
     // If we have already visited the coord in the defined direction and the value at that coord and direction is zero
     fn already_visited(&self, coord: &Coord, dir: &Direction) -> bool {
-        let set = self.energized.get_at_coord(coord);
-        set.is_some()
+        self.energized.get_at_coord(coord).is_some()
             && self
                 .energized
                 .get_at_coord(coord)
@@ -73,32 +72,24 @@ impl Contraption {
         next_coords: &[(Option<Coord>, Direction)],
     ) -> Option<HashSet<Coord>> {
         if !next_coords.iter().all(|(next_coord, next_dir)| {
-            next_coord.is_none()
-                || self
-                    .energized
-                    .get_at_coord(&next_coord.unwrap())
-                    .unwrap()
-                    .contains_key(next_dir)
+            next_coord.is_none() || self.already_visited(&next_coord.unwrap(), next_dir)
         }) {
             return None;
         }
-        // Iterator over HashSets of next coordinates
+
         let mut combined_set: HashSet<Coord> = next_coords
             .iter()
-            .filter_map(|(next_coord, next_dir)| {
-                if next_coord.is_some() {
-                    let map = self.energized.get_at_coord(&next_coord.unwrap()).unwrap();
-                    if map.contains_key(next_dir) {
-                        Some(map.get(next_dir).unwrap().clone())
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
+            .filter(|(coord, _)| coord.is_some())
+            .flat_map(|(next_coord, next_dir)| {
+                self.energized
+                    .get_at_coord(&next_coord.unwrap())
+                    .unwrap()
+                    .get(next_dir)
+                    .unwrap()
+                    .clone()
             })
-            .flatten()
             .collect();
+
         combined_set.insert(coord);
         Some(combined_set)
     }
@@ -108,7 +99,7 @@ impl Contraption {
         // The current coordinate value equals the sum of the values the current coordinate points to plus 1
         // We need to record the value for each coordinate in each direction
         println!("{:?} {:?}", start_coord, start_dir);
-        let mut loops = 9;
+        let mut in_loop = false;
         let mut stack = vec![(start_coord, start_dir)];
         while let Some((coord, dir)) = stack.pop() {
             println!("{:?}", coord);
@@ -126,10 +117,7 @@ impl Contraption {
                         }
                     }
                 }
-
-                let mut collected_set = HashSet::new();
-                collected_set.insert(coord);
-                collected_set
+                HashSet::new()
             };
 
             let dirs = self.energized.get_at_coord_mut(&coord).unwrap();
